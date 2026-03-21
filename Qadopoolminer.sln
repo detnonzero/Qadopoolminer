@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Qadopoolminer", "Qadopoolminer.csproj", "{2AC2BA6E-38B0-F53C-4243-B5DEE46A223F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2AC2BA6E-38B0-F53C-4243-B5DEE46A223F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2AC2BA6E-38B0-F53C-4243-B5DEE46A223F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2AC2BA6E-38B0-F53C-4243-B5DEE46A223F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2AC2BA6E-38B0-F53C-4243-B5DEE46A223F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {13506CA0-2634-4057-B360-654E0817F322}
+	EndGlobalSection
+EndGlobal

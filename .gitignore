@@ -1,0 +1,23 @@
+# Build outputs
+bin/
+obj/
+
+# IDE files
+.vs/
+.vscode/
+*.user
+*.rsuser
+*.suo
+
+# Release and publish outputs
+artifacts/
+release/
+
+# Local runtime data
+settings.json
+*.log
+*.db
+
+# OS files
+Thumbs.db
+Desktop.ini
