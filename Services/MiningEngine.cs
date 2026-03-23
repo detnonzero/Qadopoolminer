@@ -13,6 +13,7 @@ public sealed class MiningEngine
     private static readonly TimeSpan ShareSummaryInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ReloadDebounceInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan JobLogInterval = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan LocalValidationLogInterval = TimeSpan.FromSeconds(10);
 
     private readonly PoolApiClient _poolApiClient;
     private readonly ILogSink _log;
@@ -38,8 +39,11 @@ public sealed class MiningEngine
     private int _blockCandidates;
     private int _activeWorkers;
     private int _jobReloadInFlight;
+    private int _fatalPoolErrorStopRequested;
     private string _lastError = "";
     private string _lastLoggedJobHeight = "";
+    private long _lastLocalValidationLogUnixMs;
+    private int _discardedLocallyInvalidShares;
 
     public MiningEngine(PoolApiClient poolApiClient, ILogSink log)
     {
@@ -70,7 +74,7 @@ public sealed class MiningEngine
         }
     }
 
-    public async Task StartAsync(string minerToken, IReadOnlyList<OpenClMiningDevice> devices, int workerCount, double shareDifficulty, CancellationToken cancellationToken = default)
+    public async Task StartAsync(string minerToken, IReadOnlyList<OpenClMiningDevice> devices, int workerCount, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(minerToken))
         {
@@ -85,11 +89,6 @@ public sealed class MiningEngine
         if (workerCount <= 0)
         {
             throw new InvalidOperationException("Worker threads must be greater than zero.");
-        }
-
-        if (shareDifficulty <= 0d || double.IsNaN(shareDifficulty) || double.IsInfinity(shareDifficulty))
-        {
-            throw new InvalidOperationException("Share difficulty must be greater than zero.");
         }
 
         CancellationTokenSource runCts;
@@ -119,8 +118,11 @@ public sealed class MiningEngine
             _blockCandidates = 0;
             _activeWorkers = 0;
             _jobReloadInFlight = 0;
+            _fatalPoolErrorStopRequested = 0;
             _lastError = "";
             _lastLoggedJobHeight = "";
+            _lastLocalValidationLogUnixMs = 0;
+            _discardedLocallyInvalidShares = 0;
             _shareSubmitChannel = Channel.CreateBounded<PendingShare>(new BoundedChannelOptions(16_384)
             {
                 SingleReader = false,
@@ -404,6 +406,12 @@ public sealed class MiningEngine
 
                         for (var i = 0; i < foundCount; i++)
                         {
+                            if (!UInt256Utility.IsHashAtOrBelowTarget(foundShares[i].HashBytes, job.ShareTargetHex))
+                            {
+                                ReportLocallyInvalidShare(job, foundShares[i].HashBytes);
+                                continue;
+                            }
+
                             await QueueShareAsync(job, foundShares[i].Nonce, loadedTimestamp, foundShares[i].HashBytes, cancellationToken).ConfigureAwait(false);
                         }
 
@@ -532,6 +540,13 @@ public sealed class MiningEngine
         catch (Exception ex)
         {
             SetDisconnected(ex.Message);
+
+            if (IsPoolDifficultyOverflow(ex))
+            {
+                RequestStopAfterFatalPoolError();
+                return;
+            }
+
             _log.Warn("Mining", $"Share submission failed: {ex.Message}");
         }
     }
@@ -617,6 +632,52 @@ public sealed class MiningEngine
         var next = Interlocked.Add(ref _nextNonceBase, batchSize);
         var start = next - batchSize;
         return unchecked((ulong)start);
+    }
+
+    private void ReportLocallyInvalidShare(PoolMiningJob job, byte[] hashBytes)
+    {
+        var discardedCount = Interlocked.Increment(ref _discardedLocallyInvalidShares);
+        var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var lastLoggedUnixMs = Interlocked.Read(ref _lastLocalValidationLogUnixMs);
+        if (nowUnixMs - lastLoggedUnixMs < (long)LocalValidationLogInterval.TotalMilliseconds)
+        {
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _lastLocalValidationLogUnixMs, nowUnixMs, lastLoggedUnixMs) != lastLoggedUnixMs)
+        {
+            return;
+        }
+
+        _log.Warn(
+            "Mining",
+            $"Discarded {discardedCount} locally invalid share(s); latest hash {HexUtility.ToLowerHex(hashBytes)} exceeded target {job.ShareTargetHex}.");
+    }
+
+    private static bool IsPoolDifficultyOverflow(Exception exception)
+        => exception.Message.Contains("Share difficulty exceeds the fixed-point storage range.", StringComparison.OrdinalIgnoreCase);
+
+    private void RequestStopAfterFatalPoolError()
+    {
+        if (Interlocked.Exchange(ref _fatalPoolErrorStopRequested, 1) != 0)
+        {
+            return;
+        }
+
+        _log.Warn(
+            "Mining",
+            "Pool rejected the share because the server-side share difficulty is outside the supported range. Mining will stop to avoid repeated submit errors. Reset the miner difficulty on the pool and start again.");
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await StopAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+            }
+        });
     }
 
     private async Task RequestJobReloadAsync(PoolMiningJob sourceJob, CancellationToken cancellationToken)

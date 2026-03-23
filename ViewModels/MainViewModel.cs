@@ -640,8 +640,7 @@ public sealed class MainViewModel : ObservableObject
             throw new InvalidOperationException("Worker threads must be a positive whole number.");
         }
 
-        var shareDifficulty = ParseShareDifficulty();
-        await _miningEngine.StartAsync(_storedMinerToken, devices, workerCount, shareDifficulty).ConfigureAwait(true);
+        await _miningEngine.StartAsync(_storedMinerToken, devices, workerCount).ConfigureAwait(true);
         await PersistSettingsAsync().ConfigureAwait(true);
     }
 
@@ -834,16 +833,6 @@ public sealed class MainViewModel : ObservableObject
         PoolRoundStaleText = stats.StaleSharesRound.ToString(CultureInfo.InvariantCulture);
         PoolRoundInvalidText = stats.InvalidSharesRound.ToString(CultureInfo.InvariantCulture);
         LastShareUtcText = stats.LastShareUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? "";
-    }
-
-    private double ParseShareDifficulty()
-    {
-        if (double.TryParse(ShareDifficultyText, NumberStyles.Float, CultureInfo.InvariantCulture, out var shareDifficulty) && shareDifficulty > 0d)
-        {
-            return shareDifficulty;
-        }
-
-        throw new InvalidOperationException("Share difficulty is not available yet. Refresh miner stats or verify the miner token first.");
     }
 
     private void EnsurePoolConfigured()
