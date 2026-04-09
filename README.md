@@ -1,11 +1,11 @@
 # Qadopoolminer
 
-`Qadopoolminer` is a Windows WPF desktop miner for Qado pool mining. It connects to a Qado pool, manages a local Ed25519 miner key, accepts a miner API token from the pool dashboard, and mines with selected OpenCL devices.
+`Qadopoolminer` is a Windows WPF desktop miner for Qado pool mining. It connects to a Qado pool, accepts a miner API token from the pool dashboard, and mines with selected OpenCL devices.
 
 ## Features
 
 - pool connection testing and job loading
-- local miner key generation and challenge signing
+- token-only authentication aligned with the current Qado pool stack
 - miner token acceptance and validation
 - OpenCL device discovery and GPU mining
 - live mining stats, logs, and pool feedback
@@ -21,10 +21,8 @@
 ## Quick Start
 
 1. Enter the pool URL and test the connection.
-2. Generate or paste a miner private key and accept it.
-3. Copy the miner public key into the pool dashboard and complete the verification challenge.
-4. Paste the issued miner API token into the miner and accept it.
-5. Refresh OpenCL devices, select the devices you want to use, then start mining.
+2. Paste the issued miner API token into the miner and accept it.
+3. Refresh OpenCL devices, select the devices you want to use, then start mining.
 
 The miner stores its local configuration in `settings.json` next to the executable.
 

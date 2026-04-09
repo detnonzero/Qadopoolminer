@@ -1,5 +1,5 @@
-using System.Collections.ObjectModel;
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Threading;
@@ -14,28 +14,21 @@ namespace Qadopoolminer.ViewModels;
 public sealed class MainViewModel : ObservableObject
 {
     private readonly MinerSettingsService _settingsService;
-    private readonly MinerKeyService _keyService;
     private readonly PoolApiClient _poolApiClient;
     private readonly MiningEngine _miningEngine;
     private readonly ClipboardService _clipboardService;
-    private readonly DialogService _dialogService;
     private readonly ILogSink _log;
     private readonly DispatcherTimer _statsTimer;
     private readonly DispatcherTimer _logDrainTimer;
     private readonly ConcurrentQueue<LogEntry> _pendingLogEntries = new();
     private readonly Dictionary<string, OpenClMiningDevice> _discoveredDevices = new(StringComparer.Ordinal);
 
-    private string _storedPrivateKeyHex = "";
     private string _storedMinerToken = "";
     private bool _initialized;
     private bool _statsRefreshInFlight;
     private string _poolUrl = "";
     private string _poolConnectionStatus = "Disconnected";
-    private string _privateKeyInput = "";
-    private string _currentPublicKey = "";
     private string _minerTokenInput = "";
-    private string _challengeMessageInput = "";
-    private string _manualSignatureHex = "";
     private string _workerThreadsText = "1";
     private bool _isMining;
     private string _currentJobId = "";
@@ -59,19 +52,15 @@ public sealed class MainViewModel : ObservableObject
 
     public MainViewModel(
         MinerSettingsService settingsService,
-        MinerKeyService keyService,
         PoolApiClient poolApiClient,
         MiningEngine miningEngine,
         ClipboardService clipboardService,
-        DialogService dialogService,
         ILogSink log)
     {
         _settingsService = settingsService;
-        _keyService = keyService;
         _poolApiClient = poolApiClient;
         _miningEngine = miningEngine;
         _clipboardService = clipboardService;
-        _dialogService = dialogService;
         _log = log;
 
         Logs = new ObservableCollection<LogEntry>();
@@ -83,16 +72,9 @@ public sealed class MainViewModel : ObservableObject
         }
 
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, () => !string.IsNullOrWhiteSpace(PoolUrl));
-        GenerateKeyCommand = new RelayCommand(GenerateKey);
-        AcceptKeyCommand = new AsyncRelayCommand(AcceptKeyAsync, () => !string.IsNullOrWhiteSpace(PrivateKeyInput));
-        DeleteKeyCommand = new AsyncRelayCommand(DeleteKeyAsync, () => !string.IsNullOrWhiteSpace(_storedPrivateKeyHex));
-        CopyPublicKeyCommand = new RelayCommand(CopyPublicKey, () => !string.IsNullOrWhiteSpace(CurrentPublicKey));
         AcceptTokenCommand = new AsyncRelayCommand(AcceptTokenAsync, () => !string.IsNullOrWhiteSpace(MinerTokenInput) && !string.IsNullOrWhiteSpace(PoolUrl));
         DeleteTokenCommand = new AsyncRelayCommand(DeleteTokenAsync, () => !string.IsNullOrWhiteSpace(_storedMinerToken));
         CopyTokenCommand = new RelayCommand(CopyToken, () => !string.IsNullOrWhiteSpace(_storedMinerToken));
-        SignChallengeCommand = new AsyncRelayCommand(SignChallengeAsync, CanSignChallenge);
-        CopySignatureCommand = new RelayCommand(CopySignature, () => !string.IsNullOrWhiteSpace(ManualSignatureHex));
-        ClearSignatureCommand = new RelayCommand(ClearSignature);
         LoadJobCommand = new AsyncRelayCommand(LoadJobAsync, CanUseMinerToken);
         RefreshDevicesCommand = new AsyncRelayCommand(RefreshDevicesAsync, allowConcurrentExecution: false);
         StartMiningCommand = new AsyncRelayCommand(StartMiningAsync, CanStartMining);
@@ -120,25 +102,11 @@ public sealed class MainViewModel : ObservableObject
 
     public AsyncRelayCommand TestConnectionCommand { get; }
 
-    public RelayCommand GenerateKeyCommand { get; }
-
-    public AsyncRelayCommand AcceptKeyCommand { get; }
-
-    public AsyncRelayCommand DeleteKeyCommand { get; }
-
-    public RelayCommand CopyPublicKeyCommand { get; }
-
     public AsyncRelayCommand AcceptTokenCommand { get; }
 
     public AsyncRelayCommand DeleteTokenCommand { get; }
 
     public RelayCommand CopyTokenCommand { get; }
-
-    public AsyncRelayCommand SignChallengeCommand { get; }
-
-    public RelayCommand CopySignatureCommand { get; }
-
-    public RelayCommand ClearSignatureCommand { get; }
 
     public AsyncRelayCommand LoadJobCommand { get; }
 
@@ -160,38 +128,10 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _poolConnectionStatus, value);
     }
 
-    public string PrivateKeyInput
-    {
-        get => _privateKeyInput;
-        set => SetProperty(ref _privateKeyInput, value, RefreshCommandStates);
-    }
-
-    public string CurrentPublicKey
-    {
-        get => _currentPublicKey;
-        private set => SetProperty(ref _currentPublicKey, value, RefreshCommandStates);
-    }
-
     public string MinerTokenInput
     {
         get => _minerTokenInput;
         set => SetProperty(ref _minerTokenInput, value, RefreshCommandStates);
-    }
-
-    public string ChallengeMessageInput
-    {
-        get => _challengeMessageInput;
-        set => SetProperty(ref _challengeMessageInput, value, () =>
-        {
-            ManualSignatureHex = "";
-            RefreshCommandStates();
-        });
-    }
-
-    public string ManualSignatureHex
-    {
-        get => _manualSignatureHex;
-        private set => SetProperty(ref _manualSignatureHex, value, RefreshCommandStates);
     }
 
     public string WorkerThreadsText
@@ -316,8 +256,6 @@ public sealed class MainViewModel : ObservableObject
 
     public string MinerTokenStatus => string.IsNullOrWhiteSpace(_storedMinerToken) ? "Not present" : "Present";
 
-    public string StoredKeyStatus => string.IsNullOrWhiteSpace(_storedPrivateKeyHex) ? "Not stored" : "Stored";
-
     public string SelectedDeviceSummary => $"{OpenClDevices.Count(item => item.Selected)} of {OpenClDevices.Count} selected";
 
     public string ShareCountersText => $"{AcceptedShares} / {StaleShares} / {InvalidShares} / {DuplicateShares}";
@@ -336,29 +274,9 @@ public sealed class MainViewModel : ObservableObject
         var settings = await _settingsService.LoadAsync().ConfigureAwait(true);
 
         PoolUrl = settings.PoolUrl ?? "";
-        _storedPrivateKeyHex = settings.PrivateKeyHex?.Trim() ?? "";
         _storedMinerToken = settings.MinerToken?.Trim() ?? "";
-        PrivateKeyInput = _storedPrivateKeyHex;
         MinerTokenInput = _storedMinerToken;
         WorkerThreadsText = settings.WorkerThreads > 0 ? settings.WorkerThreads.ToString(CultureInfo.InvariantCulture) : "1";
-
-        if (!string.IsNullOrWhiteSpace(_storedPrivateKeyHex))
-        {
-            try
-            {
-                CurrentPublicKey = _keyService.DerivePublicKey(_storedPrivateKeyHex);
-            }
-            catch (Exception ex)
-            {
-                _storedPrivateKeyHex = "";
-                PrivateKeyInput = "";
-                _log.Warn("Auth", $"Stored private key could not be loaded: {ex.Message}");
-            }
-        }
-        else
-        {
-            CurrentPublicKey = settings.PublicKeyHex ?? "";
-        }
 
         await RefreshDevicesAsync().ConfigureAwait(true);
 
@@ -424,50 +342,6 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private void GenerateKey()
-    {
-        var keyPair = _keyService.GenerateEd25519KeyPair();
-        PrivateKeyInput = keyPair.PrivateKeyHex;
-        _log.Info("Auth", "Generated a new Ed25519 miner private key.");
-    }
-
-    private async Task AcceptKeyAsync()
-    {
-        var (_, publicKey) = await StorePrivateKeyFromInputAsync(clearTokenOnChange: true).ConfigureAwait(true);
-        _log.Info("Auth", $"Stored miner key. Public key: {publicKey}");
-    }
-
-    private async Task DeleteKeyAsync()
-    {
-        if (!_dialogService.Confirm("Delete Miner Key", "Delete the locally stored private key?"))
-        {
-            return;
-        }
-
-        _storedPrivateKeyHex = "";
-        PrivateKeyInput = "";
-        if (string.IsNullOrWhiteSpace(_storedMinerToken))
-        {
-            CurrentPublicKey = "";
-            ShareDifficultyText = "";
-        }
-
-        await PersistSettingsAsync().ConfigureAwait(true);
-        RefreshDerivedProperties();
-        _log.Info("Auth", "Deleted the locally stored private key.");
-    }
-
-    private void CopyPublicKey()
-    {
-        if (string.IsNullOrWhiteSpace(CurrentPublicKey))
-        {
-            return;
-        }
-
-        _clipboardService.SetText(CurrentPublicKey);
-        _log.Info("UI", "Copied public key to clipboard.");
-    }
-
     private async Task AcceptTokenAsync()
     {
         try
@@ -513,11 +387,6 @@ public sealed class MainViewModel : ObservableObject
         PoolRoundInvalidText = "";
         LastShareUtcText = "";
 
-        if (string.IsNullOrWhiteSpace(_storedPrivateKeyHex))
-        {
-            CurrentPublicKey = "";
-        }
-
         await PersistSettingsAsync().ConfigureAwait(true);
         RefreshDerivedProperties();
         _log.Info("Auth", "Deleted the stored miner token.");
@@ -532,37 +401,6 @@ public sealed class MainViewModel : ObservableObject
 
         _clipboardService.SetText(_storedMinerToken);
         _log.Info("UI", "Copied miner token to clipboard.");
-    }
-
-    private async Task SignChallengeAsync()
-    {
-        var (privateKeyHex, publicKeyHex) = await StorePrivateKeyFromInputAsync(clearTokenOnChange: false).ConfigureAwait(true);
-        var message = ChallengeMessageInput.Trim();
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            throw new InvalidOperationException("Paste a challenge string first.");
-        }
-
-        ManualSignatureHex = _keyService.SignMessage(privateKeyHex, message);
-        CurrentPublicKey = publicKeyHex;
-        _log.Info("Auth", "Signed the pasted challenge string locally.");
-    }
-
-    private void CopySignature()
-    {
-        if (string.IsNullOrWhiteSpace(ManualSignatureHex))
-        {
-            return;
-        }
-
-        _clipboardService.SetText(ManualSignatureHex);
-        _log.Info("UI", "Copied signature to clipboard.");
-    }
-
-    private void ClearSignature()
-    {
-        ChallengeMessageInput = "";
-        ManualSignatureHex = "";
     }
 
     private async Task LoadJobAsync()
@@ -692,54 +530,12 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private async Task<(string PrivateKeyHex, string PublicKeyHex)> StorePrivateKeyFromInputAsync(bool clearTokenOnChange)
-    {
-        if (string.IsNullOrWhiteSpace(PrivateKeyInput))
-        {
-            if (string.IsNullOrWhiteSpace(_storedPrivateKeyHex))
-            {
-                throw new InvalidOperationException("Enter or generate a private key first.");
-            }
-
-            var existingPublicKey = _keyService.DerivePublicKey(_storedPrivateKeyHex);
-            CurrentPublicKey = existingPublicKey;
-            return (_storedPrivateKeyHex, existingPublicKey);
-        }
-
-        var normalized = _keyService.NormalizePrivateKey(PrivateKeyInput);
-        var publicKey = _keyService.DerivePublicKey(normalized);
-        var keyChanged = !string.Equals(_storedPrivateKeyHex, normalized, StringComparison.Ordinal);
-
-        _storedPrivateKeyHex = normalized;
-        PrivateKeyInput = normalized;
-        CurrentPublicKey = publicKey;
-
-        if (clearTokenOnChange && keyChanged && !string.IsNullOrWhiteSpace(_storedMinerToken))
-        {
-            _storedMinerToken = "";
-            MinerTokenInput = "";
-            ShareDifficultyText = "";
-            PoolEstimatedHashrateText = "";
-            PoolRoundAcceptedText = "";
-            PoolRoundStaleText = "";
-            PoolRoundInvalidText = "";
-            LastShareUtcText = "";
-            _log.Info("Auth", "Cleared the stored miner token because the miner key changed.");
-        }
-
-        await PersistSettingsAsync().ConfigureAwait(true);
-        RefreshDerivedProperties();
-        return (normalized, publicKey);
-    }
-
     private async Task PersistSettingsAsync()
     {
         var settings = new AppSettings
         {
             PoolUrl = PoolUrl.Trim(),
-            PrivateKeyHex = _storedPrivateKeyHex,
             MinerToken = _storedMinerToken,
-            PublicKeyHex = CurrentPublicKey,
             SelectedDeviceIds = OpenClDevices.Where(item => item.Selected).Select(item => item.Id).ToArray(),
             WorkerThreads = ParseWorkerThreadsForSettings()
         };
@@ -824,7 +620,6 @@ public sealed class MainViewModel : ObservableObject
 
     private void ApplyMinerStats(MinerStatsResponse stats)
     {
-        CurrentPublicKey = stats.PublicKey;
         ShareDifficultyText = stats.ShareDifficulty.ToString("0.00", CultureInfo.InvariantCulture);
         PoolEstimatedHashrateText = double.TryParse(stats.EstimatedHashrate, NumberStyles.Float, CultureInfo.InvariantCulture, out var estimatedHashrate)
             ? HashrateUtility.Format(estimatedHashrate)
@@ -853,10 +648,6 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private bool CanSignChallenge()
-        => !string.IsNullOrWhiteSpace(ChallengeMessageInput)
-            && (!string.IsNullOrWhiteSpace(_storedPrivateKeyHex) || !string.IsNullOrWhiteSpace(PrivateKeyInput));
-
     private bool CanUseMinerToken()
         => !string.IsNullOrWhiteSpace(PoolUrl) && !string.IsNullOrWhiteSpace(_storedMinerToken);
 
@@ -871,7 +662,6 @@ public sealed class MainViewModel : ObservableObject
     private void RefreshDerivedProperties()
     {
         OnPropertyChanged(nameof(MinerTokenStatus));
-        OnPropertyChanged(nameof(StoredKeyStatus));
         OnPropertyChanged(nameof(SelectedDeviceSummary));
         RefreshCommandStates();
     }
@@ -879,15 +669,9 @@ public sealed class MainViewModel : ObservableObject
     private void RefreshCommandStates()
     {
         TestConnectionCommand.NotifyCanExecuteChanged();
-        AcceptKeyCommand.NotifyCanExecuteChanged();
-        DeleteKeyCommand.NotifyCanExecuteChanged();
-        CopyPublicKeyCommand.NotifyCanExecuteChanged();
         AcceptTokenCommand.NotifyCanExecuteChanged();
         DeleteTokenCommand.NotifyCanExecuteChanged();
         CopyTokenCommand.NotifyCanExecuteChanged();
-        SignChallengeCommand.NotifyCanExecuteChanged();
-        CopySignatureCommand.NotifyCanExecuteChanged();
-        ClearSignatureCommand.NotifyCanExecuteChanged();
         LoadJobCommand.NotifyCanExecuteChanged();
         RefreshDevicesCommand.NotifyCanExecuteChanged();
         StartMiningCommand.NotifyCanExecuteChanged();

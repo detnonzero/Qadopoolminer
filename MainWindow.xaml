@@ -18,15 +18,9 @@
         </Grid.RowDefinitions>
 
         <ScrollViewer Grid.Row="0"
-                      VerticalScrollBarVisibility="Auto">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0"
-                            Margin="0,0,8,0">
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
                     <GroupBox Header="Pool Connection"
                               Margin="0,0,0,12">
                         <Grid Margin="8">
@@ -74,64 +68,10 @@
                         </Grid>
                     </GroupBox>
 
-                    <GroupBox Header="Miner Key"
+                    <GroupBox Header="Miner Token"
                               Margin="0,0,0,12">
                         <Grid Margin="8">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0"
-                                       Margin="0,0,0,8"
-                                       Text="{Binding StoredKeyStatus}" />
-
-                            <TextBox Grid.Row="1"
-                                     Margin="0,0,0,8"
-                                     MinHeight="56"
-                                     Text="{Binding PrivateKeyInput, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto" />
-
-                            <WrapPanel Grid.Row="2"
-                                       Margin="0,0,0,8">
-                                <Button MinWidth="100"
-                                        Margin="0,0,8,0"
-                                        Command="{Binding GenerateKeyCommand}"
-                                        Content="Generate" />
-                                <Button MinWidth="100"
-                                        Margin="0,0,8,0"
-                                        Command="{Binding AcceptKeyCommand}"
-                                        Content="Accept" />
-                                <Button MinWidth="100"
-                                        Margin="0,0,8,0"
-                                        Command="{Binding DeleteKeyCommand}"
-                                        Content="Delete" />
-                                <Button MinWidth="120"
-                                        Command="{Binding CopyPublicKeyCommand}"
-                                        Content="Copy Public Key" />
-                            </WrapPanel>
-
-                            <TextBox Grid.Row="3"
-                                     IsReadOnly="True"
-                                     MinHeight="56"
-                                     Text="{Binding CurrentPublicKey, Mode=OneWay}"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto" />
-                        </Grid>
-                    </GroupBox>
-
-                    <GroupBox Header="Auth / Verification"
-                              Margin="0,0,0,12">
-                        <Grid Margin="8">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -162,50 +102,8 @@
                                         Command="{Binding CopyTokenCommand}"
                                         Content="Copy Token" />
                             </WrapPanel>
-
-                            <TextBlock Grid.Row="3"
-                                       Margin="0,0,0,6"
-                                       FontWeight="SemiBold"
-                                       Text="Manual Dashboard Signature" />
-
-                            <TextBlock Grid.Row="4"
-                                       Margin="0,0,0,4"
-                                       Text="Paste the challenge string from the pool dashboard, sign it locally, then paste the signature back into the dashboard." />
-
-                            <TextBox Grid.Row="5"
-                                     Margin="0,0,0,8"
-                                     MinHeight="72"
-                                     Text="{Binding ChallengeMessageInput, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto" />
-
-                            <WrapPanel Grid.Row="6"
-                                       Margin="0,0,0,8">
-                                <Button MinWidth="100"
-                                        Margin="0,0,8,0"
-                                        Command="{Binding SignChallengeCommand}"
-                                        Content="Sign" />
-                                <Button MinWidth="120"
-                                        Margin="0,0,8,0"
-                                        Command="{Binding CopySignatureCommand}"
-                                        Content="Copy Signature" />
-                                <Button MinWidth="100"
-                                        Command="{Binding ClearSignatureCommand}"
-                                        Content="Clear" />
-                            </WrapPanel>
-
-                            <TextBox Grid.Row="7"
-                                     IsReadOnly="True"
-                                     MinHeight="72"
-                                     Text="{Binding ManualSignatureHex, Mode=OneWay}"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto" />
                         </Grid>
                     </GroupBox>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1"
-                            Margin="8,0,0,0">
                     <GroupBox Header="Mining Controls"
                               Margin="0,0,0,12">
                         <Grid Margin="8">
@@ -303,17 +201,6 @@
                                        Grid.Column="1"
                                        Margin="0,0,0,6"
                                        Text="{Binding IsMining}" />
-
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="0"
-                                       Margin="0,0,8,6"
-                                       Text="Public Key" />
-                            <TextBox Grid.Row="1"
-                                     Grid.Column="1"
-                                     Margin="0,0,0,6"
-                                     IsReadOnly="True"
-                                     Text="{Binding CurrentPublicKey, Mode=OneWay}"
-                                     TextWrapping="Wrap" />
 
                             <TextBlock Grid.Row="2"
                                        Grid.Column="0"
@@ -443,8 +330,7 @@
                             </StackPanel>
                         </Grid>
                     </GroupBox>
-                </StackPanel>
-            </Grid>
+            </StackPanel>
         </ScrollViewer>
 
         <GroupBox Grid.Row="1"

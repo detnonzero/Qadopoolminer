@@ -40,19 +40,15 @@ public partial class App : Application
 
         _logService = new LogService();
         var settingsService = new MinerSettingsService(_logService);
-        var keyService = new MinerKeyService();
         var poolApiClient = new PoolApiClient(_logService);
         var clipboardService = new ClipboardService();
-        var dialogService = new DialogService();
         var miningEngine = new MiningEngine(poolApiClient, _logService);
 
         var viewModel = new MainViewModel(
             settingsService,
-            keyService,
             poolApiClient,
             miningEngine,
             clipboardService,
-            dialogService,
             _logService);
 
         DispatcherUnhandledException += (_, args) =>
